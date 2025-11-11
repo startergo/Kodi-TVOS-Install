@@ -1,0 +1,25 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Kodi files
+*.deb
+*.ipa
+kodi-extracted/
+Payload/
+
+# Xcode
+*.xcodeproj
+*.xcworkspace
+DerivedData/
+
+# Provisioning
+*.mobileprovision
+*.cer
+*.p12
+
+# Temporary files
+*.swp
+*.tmp
+*~
