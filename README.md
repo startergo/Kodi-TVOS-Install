@@ -2,6 +2,68 @@
 
 Complete guide for installing Kodi from a .deb file onto a non-jailbroken Apple TV using a paid Apple Developer account.
 
+> **Kodi stopped opening?** The Apple Distribution certificate (and the profile built on it) lasts one year.
+> Follow [Yearly renewal](#yearly-renewal-certificate-expired) below — it takes about 10 minutes and keeps your Kodi settings and add-ons.
+
+## Yearly renewal (certificate expired)
+
+Symptom: Kodi's icon is still on the Apple TV but it refuses to open. Your Developer Program membership is a
+separate thing; the certificate expires every year regardless.
+
+**Current certificate/profile expire: 2027-11-13** (renewed 2026-11-13).
+
+### 1. Make a certificate signing request (Terminal, no Keychain Access needed)
+
+```bash
+mkdir -p ~/.kodi-signing && chmod 700 ~/.kodi-signing && cd ~/.kodi-signing
+Y=$(date +%Y)
+/usr/bin/openssl genrsa -out dist$Y.key 2048 && chmod 600 dist$Y.key
+/usr/bin/openssl req -new -key dist$Y.key -out dist$Y.certSigningRequest -subj "/CN=Your Name/C=US"
+```
+
+Keep `~/.kodi-signing` — the private key never leaves your Mac and the certificate is useless without it.
+
+### 2. Create the certificate
+
+1. https://developer.apple.com/account/resources/certificates/add → **Apple Distribution** → Continue
+2. Upload `~/.kodi-signing/distYYYY.certSigningRequest` → Continue → **Download** (`distribution.cer`)
+3. Import the key and certificate into the login keychain:
+
+```bash
+cd ~/.kodi-signing
+security import dist$Y.key -k ~/Library/Keychains/login.keychain-db -T /usr/bin/codesign
+security import ~/Downloads/distribution.cer -k ~/Library/Keychains/login.keychain-db
+security find-identity -v -p codesigning     # should list "Apple Distribution: ..."
+```
+
+You can revoke the old, expired Distribution certificate on the portal.
+
+### 3. Create the provisioning profile
+
+1. https://developer.apple.com/account/resources/profiles/add
+2. Choose **tvOS Ad Hoc** — *not* the plain "Ad Hoc" just above it (that one is iOS and won't list the Apple TV)
+3. App ID: the **same** one as before (`com.startergo.UTM.kodi`) — same App ID + same team is what preserves Kodi's data
+4. Certificate: the new Distribution certificate · Device: the Apple TV
+5. Name it (e.g. `Kodi tvOS AdHoc YYYY`) → Generate → Download
+
+### 4. Re-sign and install
+
+Wake the Apple TV (home screen, not screensaver), then:
+
+```bash
+./resign-kodi-tvos.sh ~/Downloads/Kodi_tvOS_AdHoc_YYYY.mobileprovision ~/Downloads/org.xbmc.kodi-tvos_21.2-tvos.deb
+```
+
+The script reads the profile, picks the matching keychain identity, unpacks the `.deb` (no `dpkg` needed),
+removes `PlugIns`, sets the bundle ID, signs nested frameworks then the app, verifies, writes
+`~/Desktop/Kodi-signed.ipa`, and installs it **over** the existing Kodi with `xcrun devicectl`.
+
+**Don't delete Kodi from the Apple TV first** — installing over it keeps settings and add-ons.
+
+Options: `--no-install` (sign only), `--device <name|identifier>` (if several Apple TVs).
+If the install step can't find the Apple TV, see *Apple TV shows "unavailable" / "Browsing on the local area network"* below,
+then install the signed app with Xcode (Devices → **+** → `~/Desktop/Kodi-signed.ipa`) or re-run the script.
+
 ## Prerequisites
 
 ### Required Software
@@ -46,7 +108,7 @@ Complete guide for installing Kodi from a .deb file onto a non-jailbroken Apple 
 
 1. Go to: https://developer.apple.com/account/resources/profiles
 2. Click "+" to create profile
-3. Select "tvOS Ad Hoc"
+3. Select "tvOS Ad Hoc" (not the plain "Ad Hoc", which is for iOS devices)
 4. Select or create App ID (e.g., `com.yourusername.kodi`)
 5. Select your certificate
 6. Select your Apple TV device
@@ -164,11 +226,19 @@ This enables your Apple TV to be discovered by Xcode.
 - Try WiFi if Ethernet doesn't work, or vice versa
 - Check: Settings → Remotes and Devices → Remote App and Devices on Apple TV
 
+### Apple TV shows "unavailable" / "Browsing on the local area network"
+Seen during the 2026 renewal: the Apple TV pinged fine and advertised itself on the network, but Xcode
+(and `xcrun devicectl list devices`) kept it under **Disconnected**. The pairing record had gone stale.
+Fix:
+1. Xcode → Window → Devices and Simulators → right-click the Apple TV → **Unpair Device**
+2. On the Apple TV: Settings → Remotes and Devices → **Remote App and Devices** (stay on that screen)
+3. In Xcode click **Pair** and enter the code shown on the TV
+4. Wait until it moves to **Connected**, then install
+
+If that fails, restart the Apple TV (Settings → System → Restart) and pair again.
+
 ### Certificate expired
-- Certificates expire after 1 year
-- Create new certificate on Apple Developer portal
-- Create new provisioning profile
-- Re-sign and reinstall IPA
+- Kodi refuses to open; see [Yearly renewal](#yearly-renewal-certificate-expired)
 
 ## Important Notes
 
@@ -199,6 +269,13 @@ chmod +x ~/install-kodi-tvos.sh
 
 # Run installation script
 ~/install-kodi-tvos.sh
+
+# Yearly: re-sign with the new profile and install over the existing Kodi
+./resign-kodi-tvos.sh ~/Downloads/<new>.mobileprovision ~/Downloads/org.xbmc.kodi-tvos_21.2-tvos.deb
+
+# Check signing identities / Apple TV connection
+security find-identity -v -p codesigning
+xcrun devicectl list devices
 ```
 
 ## Resources
@@ -211,4 +288,5 @@ chmod +x ~/install-kodi-tvos.sh
 ---
 
 **Created:** November 11, 2025  
+**Renewed:** November 13, 2026 (tvOS 26.2, macOS 26.5)  
 **Tested on:** Apple TV 4K (A2843), tvOS 18.3, macOS 15.6, Xcode 26.1

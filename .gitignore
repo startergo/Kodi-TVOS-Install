@@ -23,3 +23,10 @@ DerivedData/
 *.swp
 *.tmp
 *~
+
+# Signing material (kept in ~/.kodi-signing, never in the repo)
+*.key
+*.certSigningRequest
+
+# Tool state
+.serena/
