@@ -27,6 +27,8 @@ DerivedData/
 # Signing material (kept in ~/.kodi-signing, never in the repo)
 *.key
 *.certSigningRequest
+*.p8
+asc.env
 
 # Tool state
 .serena/

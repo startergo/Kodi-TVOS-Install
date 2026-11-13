@@ -12,6 +12,47 @@ separate thing; the certificate expires every year regardless.
 
 **Current certificate/profile expire: 2027-11-13** (renewed 2026-11-13).
 
+### Fast path: one command (App Store Connect API)
+
+With an App Store Connect API key set up (below), the whole renewal is:
+
+```bash
+# Apple TV awake, on the home screen
+./resign-kodi-tvos.sh --renew ~/Downloads/org.xbmc.kodi-tvos_21.2-tvos.deb
+```
+
+`--renew` runs `asc.py renew`, which generates a new private key + CSR locally, creates the Apple Distribution
+certificate through the API, imports key + certificate into the login keychain, creates a **tvOS Ad Hoc** profile
+for the App ID and every enabled Apple TV on the account, and saves it to `~/Downloads`. The script then re-signs
+and installs over the existing Kodi as usual. No browser, no 2FA.
+
+`python3 asc.py check` is read-only: it lists Distribution certificates, tvOS Ad Hoc profiles (with expiry),
+the App ID and registered Apple TVs — useful to see where things stand.
+
+**One-time API key setup** (done 2026-11-13; key `kodi-renew`):
+
+1. https://appstoreconnect.apple.com/access/integrations/api → **Team Keys** (click *Request Access* the first time)
+2. Generate a key with the **Admin** role (only Admin can create certificates/profiles over the API)
+3. Download `AuthKey_<KEYID>.p8` (only downloadable once) and lock it down:
+
+```bash
+mv ~/Downloads/AuthKey_<KEYID>.p8 ~/.kodi-signing/ && chmod 600 ~/.kodi-signing/AuthKey_<KEYID>.p8
+cat > ~/.kodi-signing/asc.env <<EOF
+ASC_KEY_ID=<KEYID>
+ASC_ISSUER_ID=<Issuer ID from the same page>
+ASC_KEY_FILE=\$HOME/.kodi-signing/AuthKey_<KEYID>.p8
+KODI_BUNDLE_ID=com.startergo.UTM.kodi
+EOF
+chmod 600 ~/.kodi-signing/asc.env
+```
+
+An Admin key can do almost anything on the developer account — treat the `.p8` like a password. It never goes in
+this repo; revoke it on the same page if it leaks (or after each renewal, and make a new one next year).
+
+### Manual path (browser)
+
+If the API key is gone, do it by hand:
+
 ### 1. Make a certificate signing request (Terminal, no Keychain Access needed)
 
 ```bash

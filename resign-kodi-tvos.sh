@@ -5,6 +5,8 @@
 #
 # Usage:
 #   ./resign-kodi-tvos.sh <profile.mobileprovision> [Kodi-unsigned.ipa | kodi.deb] [--device <name|UDID>] [--no-install]
+#   ./resign-kodi-tvos.sh --renew [kodi.deb]      # also creates the new certificate + profile via the
+#                                                 # App Store Connect API (asc.py, ~/.kodi-signing/asc.env)
 #
 # Defaults: input = ~/Desktop/Kodi-unsigned.ipa, else the newest *kodi*.deb in ~/Downloads.
 # The signing certificate is picked automatically: the keychain identity whose certificate is in the profile.
@@ -14,18 +16,26 @@ set -euo pipefail
 
 die() { echo "ERROR: $*" >&2; exit 1; }
 
-PROFILE="" ; INPUT="" ; DEVICE="" ; INSTALL=1
+PROFILE="" ; INPUT="" ; DEVICE="" ; INSTALL=1 ; RENEW=0
 while [ $# -gt 0 ]; do
     case "$1" in
         --device)     DEVICE="${2:-}"; shift 2 ;;
         --no-install) INSTALL=0; shift ;;
-        -h|--help)    sed -n '2,12p' "$0"; exit 0 ;;
+        --renew)      RENEW=1; shift ;;
+        -h|--help)    sed -n '2,15p' "$0"; exit 0 ;;
         *.mobileprovision) PROFILE="$1"; shift ;;
         *.ipa|*.deb)  INPUT="$1"; shift ;;
         *) die "unknown argument: $1" ;;
     esac
 done
 
+if [ "$RENEW" = 1 ]; then
+    [ -z "$PROFILE" ] || die "--renew creates its own profile; don't pass one"
+    echo "Renewing certificate and profile through the App Store Connect API..."
+    python3 "$(cd "$(dirname "$0")" && pwd)/asc.py" renew --out "$HOME/Downloads" | tee /tmp/kodi-asc-renew.log >&2
+    PROFILE="$(tail -1 /tmp/kodi-asc-renew.log)"
+    echo ""
+fi
 [ -n "$PROFILE" ] || die "pass the .mobileprovision you downloaded (e.g. ~/Downloads/Kodi_AdHoc.mobileprovision)"
 [ -f "$PROFILE" ] || die "profile not found: $PROFILE"
 command -v python3 >/dev/null || die "python3 not found (install Xcode command line tools)"
